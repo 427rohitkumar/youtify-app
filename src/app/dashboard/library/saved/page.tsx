@@ -1,6 +1,8 @@
 import { getSavedSongsAction } from '@/modules/song/song.controller';
 import { SavedSongsView } from '@/components/library/SavedSongsView';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Saved Tracks | Youtify',
   description: 'Your individually bookmarked songs.',

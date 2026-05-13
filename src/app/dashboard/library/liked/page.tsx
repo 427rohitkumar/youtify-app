@@ -1,6 +1,8 @@
 import { getLikedSongsAction } from '@/modules/song/song.controller';
 import { LikedSongsView } from '@/components/library/LikedSongsView';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Liked Songs | Youtify',
   description: 'Your personal collection of favorite tracks.',
