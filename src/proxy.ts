@@ -5,21 +5,22 @@ const protectedRoutes = ['/dashboard', '/api/protected'];
 const authRoutes = ['/']; // Routes that should redirect to dashboard if logged in
 
 export async function proxy(request: NextRequest) {
-  const path = request.nextUrl.pathname;
-  const isProtectedRoute = protectedRoutes.some(route => path.startsWith(route));
-  const isAuthRoute = authRoutes.includes(path);
-
-  const sessionCookie = request.cookies.get('session')?.value;
-  const session = sessionCookie ? await AuthService.decryptSession(sessionCookie) : null;
-
-  // 1. If trying to access protected route without session
-  if (isProtectedRoute && !session) {
-    return NextResponse.redirect(new URL('/', request.url));
+  const { pathname } = request.nextUrl;
+  const sessionToken = request.cookies.get('session')?.value;
+  
+  let session = null;
+  if (sessionToken) {
+    session = await AuthService.decryptSession(sessionToken);
   }
 
-  // 2. If trying to access login/home with session
-  if (isAuthRoute && session) {
+  // 1. Redirect to dashboard if logged in and accessing login page
+  if (pathname === '/' && session) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
+  // 2. Redirect to login if NOT logged in and accessing dashboard
+  if (pathname.startsWith('/dashboard') && !session) {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   return NextResponse.next();
