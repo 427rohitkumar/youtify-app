@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0f0f0f;
+  --color-foreground: #ffffff;
+  --color-primary: #ff0000;
+  --color-secondary: #1e1e1e;
+  --color-accent: #ff0000;
+}
+
+:root {
+  --background: #0f0f0f;
+  --foreground: #ffffff;
+  --primary: #ff0000;
+  --secondary: #1e1e1e;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #444444;
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(15, 15, 15, 0.7);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.input-field {
+  @apply w-full px-4 py-3 bg-[#1e1e1e] border border-[#333333] rounded-xl focus:outline-none focus:border-red-600 transition-all text-white placeholder-gray-500;
+}
+
+.btn-primary {
+  @apply w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-red-900/20;
+}
