@@ -13,11 +13,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const cookiesString = process.env.YOUTUBE_COOKIES;
+    console.log(`[Extract] Video: ${videoId} | Cookies present: ${!!cookiesString}`);
+
     // 1. Check DB Cache first
     const { SongRepository } = await import('@/modules/song/song.repository');
     const cachedSong = await SongRepository.findByYoutubeId(videoId);
     
-    // We only use cache if it has a streamUrl AND it's reasonably fresh (less than 2 hours old)
     const isCacheFresh = cachedSong?.updatedAt && (Date.now() - new Date(cachedSong.updatedAt).getTime() < 1000 * 60 * 60 * 2);
 
     if (cachedSong && cachedSong.streamUrl && isCacheFresh) {
@@ -31,33 +33,36 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 2. Setup Agent with Cookies if available
+    // 2. Setup Agent & Request Options
     let agent = undefined;
-    const cookiesString = process.env.YOUTUBE_COOKIES;
-    
     if (cookiesString) {
       try {
-        // Try to parse as JSON first (if user provided JSON array)
-        // Otherwise treat as a raw cookie string
         let cookies = [];
         if (cookiesString.trim().startsWith('[')) {
           cookies = JSON.parse(cookiesString);
         } else {
-          // Convert raw cookie string to the format ytdl-core expects
-          // or just pass as headers (Distube version handles this well)
           cookies = cookiesString.split(';').map(c => {
             const [name, ...value] = c.split('=');
             return { name: name.trim(), value: value.join('=').trim(), domain: '.youtube.com' };
           });
         }
         agent = ytdl.createAgent(cookies);
+        console.log(`[Extract] Agent created with ${cookies.length} cookies`);
       } catch (e) {
-        console.warn('Failed to parse YOUTUBE_COOKIES, falling back to no agent:', e);
+        console.error('[Extract] Cookie parsing error:', e);
       }
     }
 
-    // 3. Extract using ytdl-core
-    const info = await ytdl.getInfo(videoId, { agent });
+    // 3. Extract using ytdl-core with multiple auth layers
+    const info = await ytdl.getInfo(videoId, { 
+      agent,
+      requestOptions: {
+        headers: {
+          cookie: cookiesString || '',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        }
+      }
+    });
     const format = ytdl.chooseFormat(info.formats, { 
       quality: 'highestaudio',
       filter: 'audioonly' 
