@@ -66,15 +66,17 @@ export async function GET(request: NextRequest) {
         }
       });
     } catch (e: any) {
-      console.warn('[Extract] ytdl-core failed, trying Cobalt Fallback...', e.message);
+      console.warn(`[Extract] ytdl-core failed for ${videoId}: ${e.message}`);
       
+      // FALLBACK 1: Cobalt API
       try {
-        // Cobalt API is very robust and handles rotation
+        console.log('[Extract] Trying Fallback 1: Cobalt...');
         const cobaltRes = await fetch('https://api.cobalt.tools/api/json', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'User-Agent': 'Youtify/1.0'
           },
           body: JSON.stringify({
             url: `https://www.youtube.com/watch?v=${videoId}`,
@@ -84,20 +86,49 @@ export async function GET(request: NextRequest) {
         });
         
         const apiData = await cobaltRes.json();
-        
+        console.log(`[Extract] Cobalt status: ${apiData.status}`);
+
         if (apiData && apiData.url) {
-          // Note: Cobalt often returns a direct stream or a download link
           return NextResponse.json({
             url: apiData.url,
-            duration: 0, // Cobalt doesn't always return duration in JSON
-            title: 'Streaming via Fallback',
+            duration: 0,
+            title: 'Streaming (Cobalt Fallback)',
             artist: 'YouTube',
             thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
             fromFallback: true
           });
         }
-      } catch (fallbackError) {
-        console.error('[Extract] Cobalt Fallback failed too:', fallbackError);
+      } catch (fallbackError: any) {
+        console.error('[Extract] Cobalt Fallback failed:', fallbackError.message);
+      }
+
+      // FALLBACK 2: Invidious API (Very robust against blocks)
+      try {
+        console.log('[Extract] Trying Fallback 2: Invidious...');
+        const invidiousInstance = 'invidious.projectsegfau.lt';
+        const invidiousRes = await fetch(`https://${invidiousInstance}/api/v1/videos/${videoId}`);
+        const invData = await invidiousRes.json();
+
+        if (invData && invData.adaptiveFormats) {
+          // Find the best audio format
+          const audioFormat = invData.adaptiveFormats
+            .filter((f: any) => f.type.startsWith('audio/'))
+            .sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+
+          if (audioFormat && audioFormat.url) {
+            console.log('[Extract] Invidious fallback SUCCESS');
+            return NextResponse.json({
+              url: audioFormat.url,
+              duration: invData.lengthSeconds || 0,
+              title: invData.title || 'Streaming (Invidious)',
+              artist: invData.author || 'YouTube',
+              thumbnail: invData.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+              fromFallback: true
+            });
+          }
+        }
+      } catch (invError: any) {
+        console.error('[Extract] Invidious Fallback failed:', invError.message);
       }
       
       throw e; 
