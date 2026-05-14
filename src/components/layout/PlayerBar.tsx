@@ -25,6 +25,8 @@ export function PlayerBar() {
   const [isSaving, setIsSaving] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showPlaylistSelector, setShowPlaylistSelector] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [localTime, setLocalTime] = useState(0);
 
   const { 
     currentTrack, isPlaying, isLooping, isShuffled, volume, 
@@ -181,9 +183,6 @@ export function PlayerBar() {
       setIsSaving(false);
     }
   };
-
-  const [isDragging, setIsDragging] = useState(false);
-  const [localTime, setLocalTime] = useState(0);
 
   const formatTime = (time: number) => {
     const mins = Math.floor(time / 60);
