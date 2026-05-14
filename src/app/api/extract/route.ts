@@ -66,38 +66,41 @@ export async function GET(request: NextRequest) {
         }
       });
     } catch (e: any) {
-      console.warn('[Extract] ytdl-core failed, trying Fallback API...', e.message);
+      console.warn('[Extract] ytdl-core failed, trying Cobalt Fallback...', e.message);
       
-      // Fallback Strategy: Use a Public Extraction API
-      // These APIs handle proxying and rotation themselves
       try {
-        const fallbackRes = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`);
-        // Note: Some public APIs are better, but let's try to get metadata at least
-        // or use a direct MP3 conversion API if possible.
+        // Cobalt API is very robust and handles rotation
+        const cobaltRes = await fetch('https://api.cobalt.tools/api/json', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            url: `https://www.youtube.com/watch?v=${videoId}`,
+            downloadMode: 'audio',
+            audioFormat: 'mp3'
+          })
+        });
         
-        // Alternative Fallback: cobalt.tools or similar if available, 
-        // but for now let's try a direct stream if we can find one.
-        // For Youtify, we need the stream URL.
+        const apiData = await cobaltRes.json();
         
-        // Let's use a more reliable fallback for audio
-        const audioApi = await fetch(`https://api.v-dl.com/api/info?url=https://www.youtube.com/watch?v=${videoId}`);
-        const apiData = await audioApi.json();
-        
-        if (apiData && apiData.stream) {
+        if (apiData && apiData.url) {
+          // Note: Cobalt often returns a direct stream or a download link
           return NextResponse.json({
-            url: apiData.stream,
-            duration: apiData.duration || 0,
-            title: apiData.title || 'Unknown Title',
-            artist: apiData.author || 'Unknown Artist',
-            thumbnail: apiData.thumbnail,
+            url: apiData.url,
+            duration: 0, // Cobalt doesn't always return duration in JSON
+            title: 'Streaming via Fallback',
+            artist: 'YouTube',
+            thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
             fromFallback: true
           });
         }
       } catch (fallbackError) {
-        console.error('[Extract] Fallback API failed too:', fallbackError);
+        console.error('[Extract] Cobalt Fallback failed too:', fallbackError);
       }
       
-      throw e; // Re-throw the original error if fallback fails
+      throw e; 
     }
 
     const format = ytdl.chooseFormat(info.formats, { 
