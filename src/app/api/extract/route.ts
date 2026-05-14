@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import ytdl from '@distube/ytdl-core';
 
 // Note: @distube/ytdl-core is a pure JS library that works perfectly on Vercel/Linux.
-// It doesn't require native binaries like yt-dlp.exe.
+// Using cookies helps bypass "Sign in to confirm you're not a bot" errors.
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -12,15 +12,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Video ID is required' }, { status: 400 });
   }
 
-  const url = `https://www.youtube.com/watch?v=${videoId}`;
-
   try {
     // 1. Check DB Cache first
     const { SongRepository } = await import('@/modules/song/song.repository');
     const cachedSong = await SongRepository.findByYoutubeId(videoId);
     
     // We only use cache if it has a streamUrl AND it's reasonably fresh (less than 2 hours old)
-    // Note: YouTube stream URLs usually expire in 6 hours, but 2 is safer.
     const isCacheFresh = cachedSong?.updatedAt && (Date.now() - new Date(cachedSong.updatedAt).getTime() < 1000 * 60 * 60 * 2);
 
     if (cachedSong && cachedSong.streamUrl && isCacheFresh) {
@@ -34,8 +31,33 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 2. Extract using ytdl-core (Cross-platform & Serverless friendly)
-    const info = await ytdl.getInfo(videoId);
+    // 2. Setup Agent with Cookies if available
+    let agent = undefined;
+    const cookiesString = process.env.YOUTUBE_COOKIES;
+    
+    if (cookiesString) {
+      try {
+        // Try to parse as JSON first (if user provided JSON array)
+        // Otherwise treat as a raw cookie string
+        let cookies = [];
+        if (cookiesString.trim().startsWith('[')) {
+          cookies = JSON.parse(cookiesString);
+        } else {
+          // Convert raw cookie string to the format ytdl-core expects
+          // or just pass as headers (Distube version handles this well)
+          cookies = cookiesString.split(';').map(c => {
+            const [name, ...value] = c.split('=');
+            return { name: name.trim(), value: value.join('=').trim(), domain: '.youtube.com' };
+          });
+        }
+        agent = ytdl.createAgent(cookies);
+      } catch (e) {
+        console.warn('Failed to parse YOUTUBE_COOKIES, falling back to no agent:', e);
+      }
+    }
+
+    // 3. Extract using ytdl-core
+    const info = await ytdl.getInfo(videoId, { agent });
     const format = ytdl.chooseFormat(info.formats, { 
       quality: 'highestaudio',
       filter: 'audioonly' 
@@ -48,7 +70,7 @@ export async function GET(request: NextRequest) {
     const streamUrl = format.url;
     const duration = parseInt(info.videoDetails.lengthSeconds);
 
-    // 3. Populate Cache Background
+    // 4. Populate Cache Background
     try {
       await SongRepository.saveOrUpdate({
         youtubeId: videoId,
@@ -72,8 +94,13 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Extraction error:', error);
     
+    let errorMessage = 'Extraction failed. YouTube might be blocking the request.';
+    if (error.message?.includes('confirm you’re not a bot')) {
+      errorMessage = 'YouTube Bot Detection: Please provide valid YOUTUBE_COOKIES in environment variables.';
+    }
+
     return NextResponse.json({ 
-      error: 'Extraction failed. This video might be restricted or YouTube is blocking the request.',
+      error: errorMessage,
       details: error.message 
     }, { status: 500 });
   }
