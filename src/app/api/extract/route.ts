@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { create } from 'youtube-dl-exec';
-import path from 'path';
+import ytdl from '@distube/ytdl-core';
 
-// Note: youtube-dl-exec might need to download the binary first.
-// In a serverless environment, this might be tricky, but on a VPS it's perfect.
+// Note: @distube/ytdl-core is a pure JS library that works perfectly on Vercel/Linux.
+// It doesn't require native binaries like yt-dlp.exe.
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -20,8 +19,11 @@ export async function GET(request: NextRequest) {
     const { SongRepository } = await import('@/modules/song/song.repository');
     const cachedSong = await SongRepository.findByYoutubeId(videoId);
     
-    if (cachedSong && cachedSong.streamUrl) {
-      // Note: streamUrl might expire, but we'll try it first
+    // We only use cache if it has a streamUrl AND it's reasonably fresh (less than 2 hours old)
+    // Note: YouTube stream URLs usually expire in 6 hours, but 2 is safer.
+    const isCacheFresh = cachedSong?.updatedAt && (Date.now() - new Date(cachedSong.updatedAt).getTime() < 1000 * 60 * 60 * 2);
+
+    if (cachedSong && cachedSong.streamUrl && isCacheFresh) {
       return NextResponse.json({
         url: cachedSong.streamUrl,
         duration: cachedSong.duration,
@@ -32,31 +34,29 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 2. Extract if not cached
-    const binPath = path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe');
-    const youtubedl = create(binPath);
-    
-    const output: any = await youtubedl(url, {
-      dumpSingleJson: true,
-      noWarnings: true,
-      format: 'bestaudio/best',
+    // 2. Extract using ytdl-core (Cross-platform & Serverless friendly)
+    const info = await ytdl.getInfo(videoId);
+    const format = ytdl.chooseFormat(info.formats, { 
+      quality: 'highestaudio',
+      filter: 'audioonly' 
     });
 
-    if (!output || (!output.url && !output.formats)) {
-      throw new Error('Could not find a valid stream URL');
+    if (!format || !format.url) {
+      throw new Error('Could not find a valid audio stream URL');
     }
 
-    const streamUrl = output.url || output.formats?.find((f: any) => f.acodec !== 'none' && f.vcodec === 'none')?.url;
+    const streamUrl = format.url;
+    const duration = parseInt(info.videoDetails.lengthSeconds);
 
     // 3. Populate Cache Background
     try {
       await SongRepository.saveOrUpdate({
         youtubeId: videoId,
-        title: output.title,
-        artist: output.uploader || output.artist || 'Unknown',
-        thumbnail: output.thumbnail,
+        title: info.videoDetails.title,
+        artist: info.videoDetails.author.name || 'Unknown',
+        thumbnail: info.videoDetails.thumbnails[0]?.url,
         streamUrl: streamUrl,
-        duration: output.duration,
+        duration: duration,
       });
     } catch (e) {
       console.warn('Failed to cache song:', e);
@@ -64,15 +64,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       url: streamUrl,
-      duration: output.duration,
-      title: output.title,
-      artist: output.uploader || output.artist,
-      thumbnail: output.thumbnail,
+      duration: duration,
+      title: info.videoDetails.title,
+      artist: info.videoDetails.author.name,
+      thumbnail: info.videoDetails.thumbnails[0]?.url,
     });
   } catch (error: any) {
-    console.error('yt-dlp extraction error:', error);
+    console.error('Extraction error:', error);
     
-    // Final Fallback: If yt-dlp fails, we might try a public API or show a better error
     return NextResponse.json({ 
       error: 'Extraction failed. This video might be restricted or YouTube is blocking the request.',
       details: error.message 
