@@ -18,7 +18,9 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export function PlayerBar() {
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const playerRef = useRef<any>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [hasAutoSaved, setHasAutoSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -31,6 +33,117 @@ export function PlayerBar() {
     isExtracting, setIsExtracting, likedSongs, setLikedSongs,
     savedSongs, setSavedSongs
   } = usePlayerStore();
+
+  // 1. Load YouTube IFrame API
+  useEffect(() => {
+    if (!(window as any).YT) {
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+    }
+  }, []);
+
+  // 2. Initialize/Update Player
+  useEffect(() => {
+    if (!currentTrack) return;
+
+    const initPlayer = () => {
+      if (!playerRef.current) {
+        playerRef.current = new (window as any).YT.Player('youtube-player', {
+          height: '0',
+          width: '0',
+          videoId: currentTrack.id,
+          playerVars: {
+            autoplay: isPlaying ? 1 : 0,
+            controls: 0,
+            disablekb: 1,
+            fs: 0,
+            rel: 0,
+            modestbranding: 1,
+            origin: window.location.origin
+          },
+          events: {
+            onReady: (event: any) => {
+              setIsPlayerReady(true);
+              event.target.setVolume(volume * 100);
+              if (isPlaying) event.target.playVideo();
+            },
+            onStateChange: (event: any) => {
+              if (event.data === (window as any).YT.PlayerState.ENDED) {
+                if (isLooping) {
+                  event.target.playVideo();
+                } else {
+                  playNext();
+                }
+              }
+              if (event.data === (window as any).YT.PlayerState.PLAYING) setIsPlaying(true);
+              if (event.data === (window as any).YT.PlayerState.PAUSED) setIsPlaying(false);
+            },
+            onError: (e: any) => {
+              console.error('YouTube Player Error:', e.data);
+              playNext();
+            }
+          }
+        });
+      } else {
+        if (isPlaying) {
+          playerRef.current.loadVideoById(currentTrack.id);
+        } else {
+          playerRef.current.cueVideoById(currentTrack.id);
+        }
+      }
+    };
+
+    if ((window as any).YT && (window as any).YT.Player) {
+      initPlayer();
+    } else {
+      const originalCallback = (window as any).onYouTubeIframeAPIReady;
+      (window as any).onYouTubeIframeAPIReady = () => {
+        if (originalCallback) originalCallback();
+        initPlayer();
+      };
+    }
+  }, [currentTrack?.id]);
+
+  // 3. Sync Play/Pause
+  useEffect(() => {
+    if (!playerRef.current || !isPlayerReady) return;
+    if (isPlaying) {
+      playerRef.current.playVideo();
+    } else {
+      playerRef.current.pauseVideo();
+    }
+  }, [isPlaying, isPlayerReady]);
+
+  // 4. Sync Volume
+  useEffect(() => {
+    if (playerRef.current && isPlayerReady) {
+      playerRef.current.setVolume(volume * 100);
+    }
+  }, [volume, isPlayerReady]);
+
+  // 5. Handle time updates (YouTube doesn't have onTimeUpdate event)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (playerRef.current && isPlayerReady && isPlaying && !isDragging) {
+        const current = playerRef.current.getCurrentTime();
+        const dur = playerRef.current.getDuration();
+        setTime(current, dur);
+        setLocalTime(current);
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [isPlayerReady, isPlaying, isDragging]);
+
+  const onSeek = (val: number) => {
+    setLocalTime(val);
+    if (!isDragging && playerRef.current && isPlayerReady) {
+      playerRef.current.seekTo(val, true);
+      setTime(val, playerRef.current.getDuration() || 0);
+    }
+  };
 
   const handleToggleLike = async () => {
     if (!currentTrack) return;
@@ -71,70 +184,6 @@ export function PlayerBar() {
 
   const [isDragging, setIsDragging] = useState(false);
   const [localTime, setLocalTime] = useState(0);
-
-
-  // Sync playback & Handle Missing Stream URL
-  useEffect(() => {
-    if (!audioRef.current || !currentTrack) return;
-
-    const handlePlay = async () => {
-      // If streamUrl is missing or empty, fetch it first
-      if (!currentTrack.streamUrl && !isExtracting) {
-        setIsExtracting(currentTrack.id);
-        try {
-          const res = await fetch(`/api/extract?videoId=${currentTrack.id}`);
-          const data = await res.json();
-          if (data.url) {
-             currentTrack.streamUrl = data.url;
-             if (audioRef.current) {
-               audioRef.current.src = data.url;
-               // Wait for load before play to avoid AbortError
-               audioRef.current.load();
-               if (isPlaying) {
-                 audioRef.current.play().catch(() => {});
-               }
-             }
-          }
-        } catch (err) {
-          console.error('Failed to extract stream for playback:', err);
-        } finally {
-          setIsExtracting(null);
-        }
-      }
-
-      if (audioRef.current) {
-        if (isPlaying && currentTrack.streamUrl && !isExtracting) {
-          audioRef.current.play().catch(() => {});
-        } else if (!isPlaying) {
-          audioRef.current.pause();
-        }
-      }
-    };
-
-    handlePlay();
-  }, [isPlaying, currentTrack?.id, isExtracting, setIsExtracting, setIsPlaying]);
-
-  // Sync volume
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
-    }
-  }, [volume]);
-
-  // Handle time updates
-  const onTimeUpdate = () => {
-    if (!audioRef.current || isDragging) return;
-    setTime(audioRef.current.currentTime, audioRef.current.duration || 0);
-    setLocalTime(audioRef.current.currentTime);
-  };
-
-  const onSeek = (val: number) => {
-    setLocalTime(val);
-    if (!isDragging && audioRef.current) {
-      audioRef.current.currentTime = val;
-      setTime(val, audioRef.current.duration || 0);
-    }
-  };
 
   const formatTime = (time: number) => {
     const mins = Math.floor(time / 60);
@@ -194,13 +243,8 @@ export function PlayerBar() {
   return (
     <>
     <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-[#121212]/95 backdrop-blur-2xl border-t border-white/5 px-4 pt-5 pb-2 md:py-3 z-[50] flex items-center justify-between shadow-2xl transition-all">
-      <audio
-        ref={audioRef}
-        src={currentTrack.streamUrl || undefined}
-        onTimeUpdate={onTimeUpdate}
-        onLoadedMetadata={onTimeUpdate}
-        onEnded={playNext}
-      />
+      {/* Hidden YouTube Player */}
+      <div id="youtube-player" className="hidden" />
 
       {/* Mobile Timeline (Full Width at Top) */}
       <div className="absolute top-0 left-0 right-0 h-1 bg-white/5 md:hidden group/mobile-progress">
