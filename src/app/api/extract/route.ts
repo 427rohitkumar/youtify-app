@@ -54,15 +54,52 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. Extract using ytdl-core with multiple auth layers
-    const info = await ytdl.getInfo(videoId, { 
-      agent,
-      requestOptions: {
-        headers: {
-          cookie: cookiesString || '',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    let info;
+    try {
+      info = await ytdl.getInfo(videoId, { 
+        agent,
+        requestOptions: {
+          headers: {
+            cookie: cookiesString || '',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+          }
         }
+      });
+    } catch (e: any) {
+      console.warn('[Extract] ytdl-core failed, trying Fallback API...', e.message);
+      
+      // Fallback Strategy: Use a Public Extraction API
+      // These APIs handle proxying and rotation themselves
+      try {
+        const fallbackRes = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`);
+        // Note: Some public APIs are better, but let's try to get metadata at least
+        // or use a direct MP3 conversion API if possible.
+        
+        // Alternative Fallback: cobalt.tools or similar if available, 
+        // but for now let's try a direct stream if we can find one.
+        // For Youtify, we need the stream URL.
+        
+        // Let's use a more reliable fallback for audio
+        const audioApi = await fetch(`https://api.v-dl.com/api/info?url=https://www.youtube.com/watch?v=${videoId}`);
+        const apiData = await audioApi.json();
+        
+        if (apiData && apiData.stream) {
+          return NextResponse.json({
+            url: apiData.stream,
+            duration: apiData.duration || 0,
+            title: apiData.title || 'Unknown Title',
+            artist: apiData.author || 'Unknown Artist',
+            thumbnail: apiData.thumbnail,
+            fromFallback: true
+          });
+        }
+      } catch (fallbackError) {
+        console.error('[Extract] Fallback API failed too:', fallbackError);
       }
-    });
+      
+      throw e; // Re-throw the original error if fallback fails
+    }
+
     const format = ytdl.chooseFormat(info.formats, { 
       quality: 'highestaudio',
       filter: 'audioonly' 
