@@ -426,7 +426,7 @@ export function PlayerBar() {
               onMouseDown={() => setIsDragging(true)}
               onMouseUp={() => {
                 setIsDragging(false);
-                if (audioRef.current) audioRef.current.currentTime = localTime;
+                if (playerRef.current && isPlayerReady) playerRef.current.seekTo(localTime, true);
               }}
               onChange={(e) => onSeek(parseFloat(e.target.value))}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
