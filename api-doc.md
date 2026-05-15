@@ -66,6 +66,7 @@ class YoutifyApi {
 - `POST /auth/login`: `{ "email": "...", "password": "..." }`
 - `POST /auth/otp/send`: `{ "email": "..." }`
 - `POST /auth/otp/verify`: `{ "email": "...", "otp": "..." }`
+- `POST /auth/logout`: Invalidates session (Client should clear token).
 
 ### 2. User Profile
 - `GET /profile`: Get user stats and info.
