@@ -14,8 +14,8 @@ export class HomeService {
     return 'Good evening';
   }
 
-  static async getDashboardData(): Promise<HomeData> {
-    const session = await getSession();
+  static async getDashboardData(providedSession?: any): Promise<HomeData> {
+    const session = providedSession || await getSession();
     if (!session) throw new Error('Unauthorized');
 
     await dbConnect();

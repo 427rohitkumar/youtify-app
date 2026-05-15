@@ -10,7 +10,7 @@ export async function GET() {
       return NextResponse.json({ error: UNAUTHORIZED_RESPONSE.error }, { status: UNAUTHORIZED_RESPONSE.status });
     }
 
-    const data = await HomeService.getDashboardData();
+    const data = await HomeService.getDashboardData(session);
     
     return NextResponse.json({
       success: true,
