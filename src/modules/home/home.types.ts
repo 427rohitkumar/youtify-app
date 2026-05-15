@@ -26,4 +26,10 @@ export interface HomeData {
   }>;
   likedSongs: string[];
   savedSongs: string[];
+  savedTracks?: Array<{
+    id: string;
+    title: string;
+    artist: string;
+    thumbnail: string;
+  }>;
 }

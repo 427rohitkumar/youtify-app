@@ -20,6 +20,7 @@ function cn(...inputs: ClassValue[]) {
 export function PlayerBar() {
   const playerRef = useRef<any>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
+  const isTransitioning = useRef(false);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [hasAutoSaved, setHasAutoSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -49,6 +50,7 @@ export function PlayerBar() {
   // 2. Initialize/Update Player
   useEffect(() => {
     if (!currentTrack) return;
+    isTransitioning.current = true;
 
     const initPlayer = () => {
       if (!playerRef.current) {
@@ -72,15 +74,26 @@ export function PlayerBar() {
               if (isPlaying) event.target.playVideo();
             },
             onStateChange: (event: any) => {
-              if (event.data === (window as any).YT.PlayerState.ENDED) {
+              const state = event.data;
+              const YT = (window as any).YT;
+
+              if (state === YT.PlayerState.ENDED) {
                 if (isLooping) {
                   event.target.playVideo();
                 } else {
                   playNext();
                 }
               }
-              if (event.data === (window as any).YT.PlayerState.PLAYING) setIsPlaying(true);
-              if (event.data === (window as any).YT.PlayerState.PAUSED) setIsPlaying(false);
+              if (state === YT.PlayerState.PLAYING) {
+                setIsPlaying(true);
+                isTransitioning.current = false;
+              }
+              if (state === YT.PlayerState.PAUSED) {
+                // Only set to false if we are not in the middle of a track change
+                if (!isTransitioning.current) {
+                  setIsPlaying(false);
+                }
+              }
             },
             onError: (e: any) => {
               console.error('YouTube Player Error:', e.data);
@@ -241,45 +254,34 @@ export function PlayerBar() {
 
   return (
     <>
-    <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-[#121212]/95 backdrop-blur-2xl border-t border-white/5 px-4 pt-5 pb-2 md:py-3 z-[50] flex items-center justify-between shadow-2xl transition-all">
+    <div className="fixed bottom-[64px] md:bottom-0 left-0 right-0 bg-[#121212]/98 backdrop-blur-2xl border-t border-white/5 px-3 md:px-6 py-2 md:py-3 z-[45] flex items-center justify-between shadow-2xl transition-all animate-in slide-in-from-bottom-4 duration-500">
       {/* Hidden YouTube Player */}
       <div id="youtube-player" className="hidden" />
 
-      {/* Mobile Timeline (Full Width at Top) */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-white/5 md:hidden group/mobile-progress">
+      {/* Mobile Timeline (Top Edge) */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/5 md:hidden overflow-hidden">
         <div 
-          className="absolute top-0 left-0 h-full bg-red-600 transition-all duration-100 ease-linear"
+          className="absolute top-0 left-0 h-full bg-red-600 transition-all duration-100 ease-linear shadow-[0_0_8px_rgba(255,0,0,0.5)]"
           style={{ width: `${(currentTime / duration) * 100}%` }}
-        />
-        <input
-          type="range"
-          min="0"
-          max={duration || 0}
-          value={currentTime}
-          onChange={(e) => onSeek(parseFloat(e.target.value))}
-          className="absolute -top-1 left-0 w-full h-3 opacity-0 cursor-pointer z-10"
         />
       </div>
 
       {/* Track Info */}
       <div 
         onClick={() => setIsExpanded(true)}
-        className="flex items-center gap-4 w-1/4 min-w-[200px] cursor-pointer group/track"
+        className="flex items-center gap-3 md:gap-4 flex-1 min-w-0 cursor-pointer group/track"
       >
-        <div className="relative group w-14 h-14 flex-shrink-0 rounded-lg overflow-hidden shadow-lg border border-white/10 group-hover/track:scale-105 transition-transform">
+        <div className="relative group w-10 h-10 md:w-14 md:h-14 flex-shrink-0 rounded-lg overflow-hidden shadow-lg border border-white/10">
           <img 
             src={currentTrack.thumbnail} 
             alt={currentTrack.title} 
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-black/20 group-hover/track:bg-transparent transition-colors" />
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/track:opacity-100 transition-opacity">
-            <ChevronUp className="w-6 h-6 text-white" />
-          </div>
         </div>
-        <div className="flex flex-col min-w-0">
-          <div className="flex items-center gap-4">
-            <h4 className="text-sm font-bold text-white truncate group-hover/track:text-red-500 transition-colors" dangerouslySetInnerHTML={{ __html: currentTrack.title }} />
+        <div className="flex flex-col min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <h4 className="text-sm font-bold text-white truncate" dangerouslySetInnerHTML={{ __html: currentTrack.title }} />
             
             {/* Actions Container - Stop Propagation so menu doesn't expand player */}
             <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
@@ -374,8 +376,8 @@ export function PlayerBar() {
       </div>
 
       {/* Main Controls & Progress */}
-      <div className="flex flex-col items-center gap-2 flex-1 max-w-2xl px-8">
-        <div className="flex items-center gap-4 md:gap-6">
+      <div className="flex flex-col items-center gap-2 md:flex-1 md:max-w-2xl px-2 md:px-8">
+        <div className="flex items-center gap-2 md:gap-6">
           <button 
             onClick={() => setIsShuffled(!isShuffled)}
             className={cn("hidden md:block transition-colors", isShuffled ? "text-red-600" : "text-gray-500 hover:text-white")}
@@ -385,23 +387,23 @@ export function PlayerBar() {
           
           <button 
             onClick={playPrevious}
-            className="text-gray-400 hover:text-white transition-colors active:scale-90"
+            className="hidden md:block text-gray-400 hover:text-white transition-colors active:scale-90"
           >
             <SkipBack className="w-5 h-5 fill-current" />
           </button>
 
           <button 
             onClick={() => setIsPlaying(!isPlaying)}
-            className="w-10 h-10 md:w-12 md:h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl"
+            className="w-10 h-10 md:w-12 md:h-12 bg-transparent md:bg-white text-white md:text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-90 transition-all"
           >
-            {isPlaying ? <Pause className="w-5 h-5 md:w-6 md:h-6 fill-current" /> : <Play className="w-5 h-5 md:w-6 md:h-6 fill-current translate-x-0.5" />}
+            {isPlaying ? <Pause className="w-6 h-6 md:w-6 md:h-6 fill-current" /> : <Play className="w-6 h-6 md:w-6 md:h-6 fill-current translate-x-0.5" />}
           </button>
 
           <button 
             onClick={playNext}
             className="text-gray-400 hover:text-white transition-all active:scale-90"
           >
-            <SkipForward className="w-5 h-5 fill-current" />
+            <SkipForward className="w-6 h-6 md:w-5 md:h-5 fill-current" />
           </button>
 
           <button 
@@ -412,8 +414,7 @@ export function PlayerBar() {
           </button>
         </div>
 
-        {/* Progress Bar */}
-        <div className="flex items-center gap-3 w-full">
+        <div className="hidden md:flex items-center gap-3 w-full">
           <span className="text-[10px] font-medium text-gray-500 w-8 text-right tabular-nums">
             {formatTime(isDragging ? localTime : currentTime)}
           </span>

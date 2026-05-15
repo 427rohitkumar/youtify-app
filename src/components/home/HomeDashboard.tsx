@@ -9,8 +9,7 @@ import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 
 export function HomeDashboard({ data }: { data: HomeData }) {
-  const { setCurrentTrack, isExtracting, setLikedSongs, setSavedSongs } = usePlayerStore();
-
+  const { currentTrack, isPlaying, setCurrentTrack, isExtracting, setLikedSongs, setSavedSongs, setSavedTracks } = usePlayerStore();
   useEffect(() => {
     if (data.likedSongs) {
       setLikedSongs(data.likedSongs);
@@ -18,7 +17,10 @@ export function HomeDashboard({ data }: { data: HomeData }) {
     if (data.savedSongs) {
       setSavedSongs(data.savedSongs);
     }
-  }, [data.likedSongs, data.savedSongs, setLikedSongs, setSavedSongs]);
+    if (data.savedTracks) {
+      setSavedTracks(data.savedTracks);
+    }
+  }, [data.likedSongs, data.savedSongs, data.savedTracks, setLikedSongs, setSavedSongs, setSavedTracks]);
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
@@ -118,7 +120,10 @@ export function HomeDashboard({ data }: { data: HomeData }) {
             {data.recentlyPlayed.map((song) => (
               <div
                 key={`recent-${song.id}`}
-                className="group space-y-4 cursor-pointer"
+                className={cn(
+                  "group space-y-4 cursor-pointer p-3 rounded-[32px] transition-all",
+                  currentTrack?.id === song.id ? "bg-white/5 border border-white/5 shadow-2xl" : "hover:bg-white/[0.02]"
+                )}
                 onClick={() => setCurrentTrack({
                   id: song.id,
                   title: song.title,
@@ -134,20 +139,30 @@ export function HomeDashboard({ data }: { data: HomeData }) {
                     alt={song.title}
                   />
                   <div className={cn(
-                    "absolute inset-0 bg-black/40 transition-opacity flex items-center justify-center",
-                    isExtracting === song.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    "absolute inset-0 bg-black/60 transition-opacity flex items-center justify-center",
+                    (isExtracting === song.id || currentTrack?.id === song.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                   )}>
-                    <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center shadow-2xl scale-90 group-hover:scale-100 transition-transform">
-                      {isExtracting === song.id ? (
-                        <Loader2 className="w-6 h-6 text-white animate-spin" />
-                      ) : (
+                    {isExtracting === song.id ? (
+                       <Loader2 className="w-6 h-6 text-white animate-spin" />
+                    ) : currentTrack?.id === song.id && isPlaying ? (
+                       <div className="flex items-end gap-[3px] h-8">
+                          <div className="w-[4px] bg-red-600 animate-music-bar" style={{ animationDelay: '0s' }} />
+                          <div className="w-[4px] bg-red-600 animate-music-bar" style={{ animationDelay: '0.1s' }} />
+                          <div className="w-[4px] bg-red-600 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                          <div className="w-[4px] bg-red-600 animate-music-bar" style={{ animationDelay: '0.15s' }} />
+                       </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center shadow-2xl scale-90 group-hover:scale-100 transition-transform">
                         <Play className="w-6 h-6 text-white fill-current" />
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-1 px-1">
-                  <h3 className="text-sm font-bold text-white truncate" dangerouslySetInnerHTML={{ __html: song.title }} />
+                  <h3 className={cn(
+                    "text-sm font-bold truncate transition-colors",
+                    currentTrack?.id === song.id ? "text-red-500" : "text-white group-hover:text-red-500"
+                  )} dangerouslySetInnerHTML={{ __html: song.title }} />
                   <p className="text-xs text-gray-500 font-medium truncate">{song.artist}</p>
                 </div>
               </div>
@@ -169,7 +184,10 @@ export function HomeDashboard({ data }: { data: HomeData }) {
           {data.recommendations.map((song) => (
             <div
               key={song.id}
-              className="group space-y-4 cursor-pointer"
+              className={cn(
+                "group space-y-4 cursor-pointer p-3 rounded-[32px] transition-all",
+                currentTrack?.id === song.id ? "bg-white/5 border border-white/5 shadow-2xl" : "hover:bg-white/[0.02]"
+              )}
               onClick={() => setCurrentTrack({
                 id: song.id,
                 title: song.title,
@@ -185,20 +203,30 @@ export function HomeDashboard({ data }: { data: HomeData }) {
                   alt={song.title}
                 />
                 <div className={cn(
-                  "absolute inset-0 bg-black/40 transition-opacity flex items-center justify-center",
-                  isExtracting === song.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  "absolute inset-0 bg-black/60 transition-opacity flex items-center justify-center",
+                  (isExtracting === song.id || currentTrack?.id === song.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 )}>
-                  <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center shadow-2xl scale-90 group-hover:scale-100 transition-transform">
-                    {isExtracting === song.id ? (
+                   {isExtracting === song.id ? (
                       <Loader2 className="w-6 h-6 text-white animate-spin" />
-                    ) : (
-                      <Play className="w-6 h-6 text-white fill-current" />
-                    )}
-                  </div>
+                   ) : currentTrack?.id === song.id && isPlaying ? (
+                      <div className="flex items-end gap-[3px] h-8">
+                         <div className="w-[4px] bg-red-600 animate-music-bar" style={{ animationDelay: '0s' }} />
+                         <div className="w-[4px] bg-red-600 animate-music-bar" style={{ animationDelay: '0.1s' }} />
+                         <div className="w-[4px] bg-red-600 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                         <div className="w-[4px] bg-red-600 animate-music-bar" style={{ animationDelay: '0.15s' }} />
+                      </div>
+                   ) : (
+                      <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center shadow-2xl scale-90 group-hover:scale-100 transition-transform">
+                        <Play className="w-6 h-6 text-white fill-current" />
+                      </div>
+                   )}
                 </div>
               </div>
               <div className="space-y-1 px-1">
-                <h3 className="text-sm font-bold text-white truncate" dangerouslySetInnerHTML={{ __html: song.title }} />
+                <h3 className={cn(
+                  "text-sm font-bold truncate transition-colors",
+                  currentTrack?.id === song.id ? "text-red-500" : "text-white group-hover:text-red-500"
+                )} dangerouslySetInnerHTML={{ __html: song.title }} />
                 <p className="text-xs text-gray-400 truncate">{song.artist}</p>
               </div>
             </div>

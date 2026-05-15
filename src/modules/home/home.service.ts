@@ -22,7 +22,10 @@ export class HomeService {
     const user = await User.findById(session.userId);
     if (!user) throw new Error('User not found');
 
-    // 1. Get Playlists and Liked Songs Count
+    // 1. Populate User Collections
+    await user.populate('likedSongs savedSongs');
+
+    // 2. Get Playlists and Liked Songs Count
     const playlists = await PlaylistRepository.findAllByUser(session.userId as string);
     const likedSongsCount = user.likedSongs.length;
 
@@ -74,8 +77,14 @@ export class HomeService {
       },
       recentlyPlayed,
       recommendations,
-      likedSongs: (await user.populate('likedSongs savedSongs')).likedSongs?.map((s: any) => s.youtubeId) || [],
-      savedSongs: (user as any).savedSongs?.map((s: any) => s.youtubeId) || [],
+      likedSongs: user.likedSongs?.map((s: any) => s.youtubeId) || [],
+      savedSongs: user.savedSongs?.map((s: any) => s.youtubeId) || [],
+      savedTracks: user.savedSongs?.map((s: any) => ({
+        id: s.youtubeId,
+        title: s.title,
+        artist: s.artist,
+        thumbnail: s.thumbnail
+      })) || []
     };
   }
 }

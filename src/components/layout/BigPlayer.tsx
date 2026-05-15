@@ -8,6 +8,7 @@ import {
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { cn } from '@/lib/utils';
 import { toggleLikeSongAction, toggleSaveSongAction } from '@/modules/song/song.controller';
+import { PlaylistSelector } from './PlaylistSelector';
 
 export function BigPlayer({ onClose, onSeek }: { onClose: () => void, onSeek: (val: number) => void }) {
   const {
@@ -18,6 +19,7 @@ export function BigPlayer({ onClose, onSeek }: { onClose: () => void, onSeek: (v
   } = usePlayerStore();
 
   const [isSaving, setIsSaving] = useState(false);
+  const [showPlaylistSelector, setShowPlaylistSelector] = useState(false);
 
   if (!currentTrack) return null;
 
@@ -83,56 +85,69 @@ export function BigPlayer({ onClose, onSeek }: { onClose: () => void, onSeek: (v
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Playing From</p>
           <h3 className="text-sm font-bold text-white">Your Collection</h3>
         </div>
-        <button className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/70 hover:text-white">
-          <ListMusic className="w-6 h-6" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setShowPlaylistSelector(true)}
+            className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/70 hover:text-white"
+          >
+            <ListMusic className="w-5 h-5 md:w-6 md:h-6" />
+          </button>
+          
+          {/* Volume Slider in Header */}
+          <div className="hidden md:flex items-center gap-2 group w-24">
+            <Volume2 className="w-4 h-4 text-white/40" />
+            <div className="flex-1 relative h-1 bg-white/10 rounded-full flex items-center">
+              <input 
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={volume}
+                onChange={(e) => setVolume(parseFloat(e.target.value))}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              />
+              <div className="absolute inset-0 bg-white/40 rounded-full group-hover:bg-red-600 transition-colors" style={{ width: `${volume * 100}%` }} />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-8 md:px-24 gap-12">
-        {/* Large Thumbnail */}
-        <div className="w-full max-w-md aspect-square rounded-[40px] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/10 group relative">
-          <img src={currentTrack.thumbnail} className="w-full h-full object-cover" alt={currentTrack.title} />
-          <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
-        </div>
-
-        {/* Info */}
-        <div className="w-full max-w-2xl flex items-center justify-between gap-8">
-          <div className="min-w-0">
-            <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter mb-2 truncate" dangerouslySetInnerHTML={{ __html: currentTrack.title }} />
-            <p className="text-xl md:text-2xl text-white/60 font-medium truncate">{currentTrack.artist}</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleToggleLike}
-              className={cn(
-                "p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all active:scale-90",
-                likedSongs.includes(currentTrack.id) ? "text-red-600" : "text-white/70 hover:text-white"
-              )}
-            >
-              <Heart className={cn("w-7 h-7", likedSongs.includes(currentTrack.id) && "fill-current")} />
-            </button>
-            <button
-              onClick={handleToggleSave}
-              disabled={isSaving}
-              className={cn(
-                "p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all active:scale-90",
-                savedSongs.includes(currentTrack.id) ? "text-red-500" : "text-white/70 hover:text-white",
-                isSaving && "opacity-50 cursor-not-allowed"
-              )}
-            >
-              <Bookmark className={cn("w-7 h-7", savedSongs.includes(currentTrack.id) && "fill-current")} />
-            </button>
+      {/* Content Area */}
+      <div className="relative z-10 flex-1 flex flex-col px-6 md:px-24 py-4 max-w-5xl mx-auto w-full min-h-0">
+        {/* Artwork Area - Guaranteed space */}
+        <div className="flex-1 min-h-0 flex items-center justify-center p-4">
+          <div className="h-full max-h-[300px] md:max-h-[450px] aspect-square rounded-[32px] md:rounded-[40px] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/10 relative transition-transform duration-500 hover:scale-[1.02]">
+            <img src={currentTrack.thumbnail} className="w-full h-full object-cover" alt={currentTrack.title} />
+            <div className="absolute inset-0 bg-black/20" />
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="w-full max-w-2xl space-y-8">
-          {/* Progress */}
-          <div className="space-y-4">
-            <div className="relative h-2 w-full bg-white/10 rounded-full group cursor-pointer">
+        {/* Info Area - Separated with gap */}
+        <div className="mt-4 space-y-6 md:space-y-8 flex-shrink-0">
+          {/* Info & Like */}
+          <div className="flex items-center justify-between gap-6">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl md:text-3xl font-black text-white tracking-tighter mb-0.5 md:mb-1 truncate" dangerouslySetInnerHTML={{ __html: currentTrack.title }} />
+              <p className="text-sm md:text-xl text-white/60 font-medium truncate">{currentTrack.artist}</p>
+            </div>
+            <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
+              <button
+                onClick={handleToggleLike}
+                className={cn(
+                  "p-2 md:p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all active:scale-90",
+                  likedSongs.includes(currentTrack.id) ? "text-red-600" : "text-white/70 hover:text-white"
+                )}
+              >
+                <Heart className={cn("w-5 h-5 md:w-6 md:h-6", likedSongs.includes(currentTrack.id) && "fill-current")} />
+              </button>
+            </div>
+          </div>
+
+          {/* Progress Section */}
+          <div className="space-y-2 md:space-y-3">
+            <div className="relative h-1 md:h-1.5 w-full bg-white/10 rounded-full group cursor-pointer">
               <div
-                className="absolute top-0 left-0 h-full bg-red-600 rounded-full transition-all duration-100 ease-linear"
+                className="absolute top-0 left-0 h-full bg-red-600 rounded-full transition-all duration-100 ease-linear shadow-[0_0_10px_rgba(255,0,0,0.4)]"
                 style={{ width: `${(currentTime / duration) * 100}%` }}
               />
               <input
@@ -143,62 +158,104 @@ export function BigPlayer({ onClose, onSeek }: { onClose: () => void, onSeek: (v
                 onChange={(e) => onSeek(parseFloat(e.target.value))}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               />
-              {/* Knob */}
-              <div 
-                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-xl opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{ left: `${(currentTime / duration) * 100}%`, transform: 'translate(-50%, -50%)' }}
-              />
             </div>
-            <div className="flex justify-between text-xs font-black text-white/40 tabular-nums uppercase tracking-widest">
+            <div className="flex justify-between text-[10px] font-bold text-white/30 tabular-nums uppercase tracking-widest">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
             </div>
           </div>
 
           {/* Playback Buttons */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 md:gap-4">
             <button
               onClick={() => setIsShuffled(!isShuffled)}
-              className={cn("transition-colors", isShuffled ? "text-red-600" : "text-white/40 hover:text-white")}
+              className={cn("transition-colors p-2", isShuffled ? "text-red-600" : "text-white/30 hover:text-white")}
             >
-              <Shuffle className="w-7 h-7" />
+              <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
             </button>
-
-            <div className="flex items-center gap-12">
-              <button onClick={playPrevious} className="text-white/80 hover:text-white transition-colors active:scale-90">
-                <SkipBack className="w-10 h-10 fill-current" />
+            
+            <div className="flex items-center gap-4 md:gap-10">
+              <button onClick={playPrevious} className="text-white/70 hover:text-white transition-colors active:scale-75">
+                <SkipBack className="w-6 h-6 md:w-8 md:h-8 fill-current" />
               </button>
               <button
                 onClick={() => setIsPlaying(!isPlaying)}
-                className="w-24 h-24 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-white/10"
+                className="w-14 h-14 md:w-18 md:h-18 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-90 transition-all shadow-xl shadow-white/10"
               >
-                {isPlaying ? <Pause className="w-10 h-10 fill-current" /> : <Play className="w-10 h-10 fill-current translate-x-1" />}
+                {isPlaying ? <Pause className="w-6 h-6 md:w-8 md:h-8 fill-current" /> : <Play className="w-6 h-6 md:w-8 md:h-8 fill-current translate-x-0.5" />}
               </button>
-              <button onClick={playNext} className="text-white/80 hover:text-white transition-colors active:scale-90">
-                <SkipForward className="w-10 h-10 fill-current" />
+              <button onClick={playNext} className="text-white/70 hover:text-white transition-colors active:scale-75">
+                <SkipForward className="w-6 h-6 md:w-8 md:h-8 fill-current" />
               </button>
             </div>
 
             <button
               onClick={() => setIsLooping(!isLooping)}
-              className={cn("transition-colors", isLooping ? "text-red-600" : "text-white/40 hover:text-white")}
+              className={cn("transition-colors p-2", isLooping ? "text-red-600" : "text-white/30 hover:text-white")}
             >
-              <Repeat className="w-7 h-7" />
+              <Repeat className="w-5 h-5 md:w-6 md:h-6" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Footer / Volume */}
-      <div className="relative z-10 p-12 flex items-center justify-center gap-4">
-        <Volume2 className="w-5 h-5 text-white/40" />
-        <div className="w-48 h-1 bg-white/10 rounded-full relative">
-          <div
-            className="absolute top-0 left-0 h-full bg-white/60 rounded-full"
-            style={{ width: `${volume * 100}%` }}
-          />
+      {/* Footer / Utilities */}
+      <div className="relative z-10 p-4 flex items-center justify-between md:justify-center gap-8 max-w-2xl mx-auto w-full">
+        <button 
+          onClick={handleToggleSave}
+          className={cn(
+            "p-2 transition-all active:scale-90 md:hidden",
+            savedSongs.includes(currentTrack.id) ? "text-red-500" : "text-white/40 hover:text-white"
+          )}
+        >
+          <Bookmark className={cn("w-6 h-6", savedSongs.includes(currentTrack.id) && "fill-current")} />
+        </button>
+
+        {/* Mobile Volume Slider in Footer */}
+        <div className="md:hidden flex-1 flex items-center gap-4">
+          <Volume2 className="w-5 h-5 text-white/40" />
+          <div className="flex-1 h-1 bg-white/10 rounded-full relative group cursor-pointer">
+            <input 
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onChange={(e) => setVolume(parseFloat(e.target.value))}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            />
+            <div
+              className="absolute top-0 left-0 h-full bg-white/60 rounded-full"
+              style={{ width: `${volume * 100}%` }}
+            />
+          </div>
         </div>
+
+        <button className="p-2 text-white/40 hover:text-white transition-colors md:hidden opacity-0 pointer-events-none">
+          <ListMusic className="w-6 h-6" />
+        </button>
       </div>
+
+      {/* Playlist Selector Overlay */}
+      {showPlaylistSelector && (
+        <div 
+          onClick={() => setShowPlaylistSelector(false)}
+          className="absolute inset-0 z-[300] bg-black/40 backdrop-blur-md flex items-center justify-center p-6 cursor-pointer"
+        >
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm cursor-default">
+            <PlaylistSelector 
+              song={{
+                id: currentTrack.id,
+                title: currentTrack.title,
+                artist: currentTrack.artist,
+                thumbnail: currentTrack.thumbnail,
+                duration
+              }}
+              onClose={() => setShowPlaylistSelector(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

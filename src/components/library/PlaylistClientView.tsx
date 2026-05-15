@@ -8,7 +8,7 @@ import { removeSongFromPlaylistAction } from '@/modules/playlist/playlist.contro
 import { useRouter } from 'next/navigation';
 
 export function PlaylistClientView({ playlist }: { playlist: any }) {
-  const { setCurrentTrack, isExtracting, setQueue } = usePlayerStore();
+  const { currentTrack, isPlaying, setCurrentTrack, isExtracting, setQueue } = usePlayerStore();
   const router = useRouter();
 
   const handlePlaySong = (song: any, index: number) => {
@@ -85,15 +85,27 @@ export function PlaylistClientView({ playlist }: { playlist: any }) {
                </tr>
             </thead>
             <tbody>
-               {playlist.songs.map((song: any, index: number) => (
+               {playlist.songs.map((song: any, index: number) => {
+                  const songId = song.youtubeId || song.id;
+                  const isActive = currentTrack?.id === songId;
+                  return (
                   <tr 
                     key={index} 
                     onClick={() => handlePlaySong(song, index)}
-                    className="group hover:bg-white/5 transition-all cursor-pointer border-b border-white/[0.02] last:border-0"
+                    className={cn(
+                      "group transition-all cursor-pointer border-b border-white/[0.02] last:border-0",
+                      isActive ? "bg-white/10" : "hover:bg-white/5"
+                    )}
                   >
                      <td className="py-4 px-2 md:px-4 text-[10px] md:text-xs text-gray-500 font-black tabular-nums text-center">
-                        {isExtracting === (song.youtubeId || song.id) ? (
+                        {isExtracting === songId ? (
                            <Loader2 className="w-3 h-3 md:w-4 md:h-4 text-[#007ACC] animate-spin mx-auto" />
+                        ) : isActive && isPlaying ? (
+                           <div className="flex items-end justify-center gap-[2px] h-3">
+                              <div className="w-[2px] bg-[#007ACC] animate-music-bar" style={{ animationDelay: '0s' }} />
+                              <div className="w-[2px] bg-[#007ACC] animate-music-bar" style={{ animationDelay: '0.1s' }} />
+                              <div className="w-[2px] bg-[#007ACC] animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                           </div>
                         ) : (
                            index + 1
                         )}
@@ -102,19 +114,28 @@ export function PlaylistClientView({ playlist }: { playlist: any }) {
                         <div className="flex items-center gap-3 md:gap-4">
                            <div className="relative w-10 h-10 md:w-12 md:h-12 rounded-lg overflow-hidden shadow-lg border border-white/5 flex-shrink-0">
                               <img src={song.thumbnail} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt="" />
-                              <div className={cn(
-                                "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
-                                isExtracting === (song.youtubeId || song.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                              )}>
-                                 {isExtracting === (song.youtubeId || song.id) ? (
-                                    <Loader2 className="w-4 h-4 md:w-5 md:h-5 text-white animate-spin" />
-                                 ) : (
-                                    <Play className="w-4 h-4 md:w-5 md:h-5 text-white fill-current" />
-                                 )}
-                              </div>
+                               <div className={cn(
+                                 "absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity",
+                                 (isExtracting === songId || isActive) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                               )}>
+                                  {isExtracting === songId ? (
+                                     <Loader2 className="w-4 h-4 md:w-5 md:h-5 text-white animate-spin" />
+                                  ) : isActive && isPlaying ? (
+                                     <div className="flex items-end gap-[2px] h-4">
+                                        <div className="w-[2px] bg-[#007ACC] animate-music-bar" style={{ animationDelay: '0s' }} />
+                                        <div className="w-[2px] bg-[#007ACC] animate-music-bar" style={{ animationDelay: '0.1s' }} />
+                                        <div className="w-[2px] bg-[#007ACC] animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                                     </div>
+                                  ) : (
+                                     <Play className="w-4 h-4 md:w-5 md:h-5 text-white fill-current" />
+                                  )}
+                               </div>
                            </div>
                            <div className="min-w-0">
-                              <h4 className="text-xs md:text-sm font-bold text-white truncate group-hover:text-[#007ACC] transition-colors" dangerouslySetInnerHTML={{ __html: song.title }} />
+                               <h4 className={cn(
+                                 "text-xs md:text-sm font-bold truncate transition-colors",
+                                 isActive ? "text-[#007ACC]" : "text-white group-hover:text-[#007ACC]"
+                               )} dangerouslySetInnerHTML={{ __html: song.title }} />
                               <p className="text-[10px] md:text-xs text-gray-500 truncate">{song.artist}</p>
                            </div>
                         </div>
@@ -136,7 +157,8 @@ export function PlaylistClientView({ playlist }: { playlist: any }) {
                         </div>
                      </td>
                   </tr>
-               ))}
+                );
+               })}
             </tbody>
          </table>
          

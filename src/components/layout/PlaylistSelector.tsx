@@ -49,7 +49,7 @@ export function PlaylistSelector({ song, onClose }: { song: any, onClose: () => 
   };
 
   return (
-    <div className="absolute bottom-full right-0 mb-4 w-64 bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 z-[100]">
+    <div className="w-full max-w-sm bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-[0_32px_64px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in-95 duration-300 z-[100]">
       <div className="p-4 border-b border-white/5 flex items-center justify-between bg-[#1e1e1e]">
         <h3 className="text-sm font-bold text-white">Add to Playlist</h3>
         <ListMusic className="w-4 h-4 text-gray-500" />

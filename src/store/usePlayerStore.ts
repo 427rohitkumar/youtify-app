@@ -21,6 +21,7 @@ interface PlayerState {
   isExtracting: string | null;
   likedSongs: string[];
   savedSongs: string[];
+  savedTracks: Track[]; // Store actual track data for autoplay fallback
 
   setCurrentTrack: (track: Track | null) => void;
   setIsPlaying: (isPlaying: boolean) => void;
@@ -31,6 +32,7 @@ interface PlayerState {
   setIsExtracting: (isExtracting: string | null) => void;
   setLikedSongs: (likedSongs: string[]) => void;
   setSavedSongs: (savedSongs: string[]) => void;
+  setSavedTracks: (tracks: Track[]) => void;
   setQueue: (tracks: Track[]) => void;
   addToQueue: (track: Track) => void;
   removeFromQueue: (trackId: string) => void;
@@ -51,6 +53,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isExtracting: null,
   likedSongs: [],
   savedSongs: [],
+  savedTracks: [],
 
   setCurrentTrack: (track) => set({ currentTrack: track, isPlaying: !!track }),
   setIsPlaying: (isPlaying) => set({ isPlaying }),
@@ -61,6 +64,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setIsExtracting: (isExtracting) => set({ isExtracting }),
   setLikedSongs: (likedSongs) => set({ likedSongs }),
   setSavedSongs: (savedSongs) => set({ savedSongs }),
+  setSavedTracks: (tracks) => set({ savedTracks: tracks }),
   
   setQueue: (tracks) => set({ queue: tracks }),
   addToQueue: (track) => set((state) => ({ queue: [...state.queue, track] })),
@@ -70,29 +74,41 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   })),
 
   playNext: () => {
-    const { queue, currentTrack, isShuffled, isLooping } = get();
-    if (queue.length === 0) return;
-
-    // Find current index
-    const currentIndex = currentTrack ? queue.findIndex(t => t.id === currentTrack.id) : -1;
+    const { queue, currentTrack, isShuffled, isLooping, savedTracks } = get();
+    
+    // Use savedTracks as fallback if queue is empty
+    const activeQueue = queue.length > 0 ? queue : savedTracks;
+    if (activeQueue.length === 0) return;
+ 
+    // Find current index in the active queue
+    const currentIndex = currentTrack ? activeQueue.findIndex(t => t.id === currentTrack.id) : -1;
     let nextIndex: number;
-
+ 
     if (isShuffled) {
-      nextIndex = Math.floor(Math.random() * queue.length);
-      // Ensure we don't play the same song if queue > 1
-      if (nextIndex === currentIndex && queue.length > 1) {
-        nextIndex = (nextIndex + 1) % queue.length;
+      nextIndex = Math.floor(Math.random() * activeQueue.length);
+      if (nextIndex === currentIndex && activeQueue.length > 1) {
+        nextIndex = (nextIndex + 1) % activeQueue.length;
       }
     } else {
-      nextIndex = (currentIndex + 1) % queue.length;
-      // If we're at the end and not looping, stop or go back to start
-      if (nextIndex === 0 && !isLooping && currentIndex !== -1) {
-        set({ isPlaying: false });
-        return;
+      nextIndex = (currentIndex + 1) % activeQueue.length;
+      
+      // If we're at the end
+      if (nextIndex === 0 && currentIndex !== -1) {
+        // If we are playing from a temporary queue (like search) and reach the end,
+        // and we have saved tracks, switch to playing saved tracks
+        if (queue.length > 0 && savedTracks.length > 0 && !isLooping) {
+           set({ queue: [], currentTrack: savedTracks[0], isPlaying: true });
+           return;
+        }
+
+        if (!isLooping) {
+          set({ isPlaying: false });
+          return;
+        }
       }
     }
-
-    set({ currentTrack: queue[nextIndex], isPlaying: true });
+ 
+    set({ currentTrack: activeQueue[nextIndex], isPlaying: true });
   },
 
   playPrevious: () => {

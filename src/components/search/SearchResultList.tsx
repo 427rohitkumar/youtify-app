@@ -10,6 +10,7 @@ import { toggleLikeSongAction, toggleSaveSongAction } from '@/modules/song/song.
 export function SearchResultList() {
   const { results, query } = useSearchStore();
   const { 
+    currentTrack, isPlaying,
     setCurrentTrack, isExtracting, 
     likedSongs, setLikedSongs,
     savedSongs, setSavedSongs,
@@ -64,7 +65,10 @@ export function SearchResultList() {
         <div 
           key={item.id}
           onClick={() => handlePlay(item, index)}
-          className="group flex items-center gap-4 p-2.5 hover:bg-white/5 active:bg-white/10 rounded-2xl transition-all cursor-pointer relative"
+          className={cn(
+            "group flex items-center gap-4 p-2.5 hover:bg-white/5 active:bg-white/10 rounded-2xl transition-all cursor-pointer relative",
+            currentTrack?.id === item.id && "bg-white/10 border border-white/5 shadow-[0_0_20px_rgba(255,0,0,0.1)]"
+          )}
         >
           {/* Thumbnail */}
           <div className="relative w-14 h-14 flex-shrink-0 rounded-xl overflow-hidden shadow-2xl border border-white/5">
@@ -74,11 +78,18 @@ export function SearchResultList() {
               className="w-full h-full object-cover transition-transform group-hover:scale-110"
             />
             <div className={cn(
-              "absolute inset-0 bg-black/40 transition-opacity flex items-center justify-center",
-              isExtracting === item.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              "absolute inset-0 bg-black/60 transition-opacity flex items-center justify-center",
+              (isExtracting === item.id || currentTrack?.id === item.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             )}>
               {isExtracting === item.id ? (
                 <Loader2 className="w-6 h-6 text-white animate-spin" />
+              ) : currentTrack?.id === item.id && isPlaying ? (
+                <div className="flex items-end gap-[3px] h-5">
+                   <div className="w-[3px] bg-red-600 animate-music-bar" style={{ animationDelay: '0s' }} />
+                   <div className="w-[3px] bg-red-600 animate-music-bar" style={{ animationDelay: '0.1s' }} />
+                   <div className="w-[3px] bg-red-600 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                   <div className="w-[3px] bg-red-600 animate-music-bar" style={{ animationDelay: '0.15s' }} />
+                </div>
               ) : (
                 <Play className="w-6 h-6 text-white fill-current" />
               )}
@@ -87,7 +98,10 @@ export function SearchResultList() {
 
           {/* Info */}
           <div className="flex-1 min-w-0 pr-2">
-            <h4 className="text-[15px] font-bold text-white leading-snug line-clamp-1 group-hover:text-red-500 transition-colors" 
+            <h4 className={cn(
+              "text-[15px] font-bold leading-snug line-clamp-1 transition-colors",
+              currentTrack?.id === item.id ? "text-red-500" : "text-white group-hover:text-red-500"
+            )} 
                 dangerouslySetInnerHTML={{ __html: item.title }} 
             />
             <p className="text-xs text-gray-500 mt-0.5 line-clamp-1 font-medium">{item.artist}</p>

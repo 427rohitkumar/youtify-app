@@ -1,12 +1,25 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Play, Clock, Bookmark, Music, Loader2, Heart } from 'lucide-react';
 import { usePlayerStore, Track } from '@/store/usePlayerStore';
 import { cn } from '@/lib/utils';
 import { toggleSaveSongAction, toggleLikeSongAction } from '@/modules/song/song.controller';
 
 export function SavedSongsView({ songs }: { songs: any[] }) {
-  const { setCurrentTrack, isExtracting, setSavedSongs, savedSongs, setLikedSongs, likedSongs, setQueue } = usePlayerStore();
+  const { currentTrack, isPlaying, setCurrentTrack, isExtracting, setSavedSongs, savedSongs, setLikedSongs, likedSongs, setQueue, setSavedTracks } = usePlayerStore();
+ 
+  useEffect(() => {
+    if (songs) {
+      setSavedTracks(songs.map((s: any) => ({
+        id: s.youtubeId,
+        title: s.title,
+        artist: s.artist,
+        thumbnail: s.thumbnail,
+        streamUrl: ''
+      })));
+    }
+  }, [songs, setSavedTracks]);
 
   const handlePlaySong = (song: any, index: number) => {
     const tracks: Track[] = songs.map((s: any) => ({
@@ -69,15 +82,26 @@ export function SavedSongsView({ songs }: { songs: any[] }) {
                </tr>
             </thead>
             <tbody>
-               {songs.map((song: any, index: number) => (
+                {songs.map((song: any, index: number) => {
+                  const isActive = currentTrack?.id === song.youtubeId;
+                  return (
                   <tr 
                     key={song.youtubeId} 
                     onClick={() => handlePlaySong(song, index)}
-                    className="group hover:bg-white/5 transition-all cursor-pointer border-b border-white/[0.02] last:border-0"
+                    className={cn(
+                      "group transition-all cursor-pointer border-b border-white/[0.02] last:border-0",
+                      isActive ? "bg-white/10" : "hover:bg-white/5"
+                    )}
                   >
                      <td className="py-4 px-2 md:px-4 text-[10px] md:text-xs text-gray-500 font-black tabular-nums text-center">
                         {isExtracting === song.youtubeId ? (
                            <Loader2 className="w-3 h-3 md:w-4 md:h-4 text-blue-600 animate-spin mx-auto" />
+                        ) : isActive && isPlaying ? (
+                           <div className="flex items-end justify-center gap-[2px] h-3">
+                              <div className="w-[2px] bg-blue-600 animate-music-bar" style={{ animationDelay: '0s' }} />
+                              <div className="w-[2px] bg-blue-600 animate-music-bar" style={{ animationDelay: '0.1s' }} />
+                              <div className="w-[2px] bg-blue-600 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                           </div>
                         ) : (
                            index + 1
                         )}
@@ -86,19 +110,28 @@ export function SavedSongsView({ songs }: { songs: any[] }) {
                         <div className="flex items-center gap-3 md:gap-4">
                            <div className="relative w-10 h-10 md:w-12 md:h-12 rounded-lg overflow-hidden shadow-lg border border-white/5 flex-shrink-0">
                               <img src={song.thumbnail} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt="" />
-                              <div className={cn(
-                                "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
-                                isExtracting === song.youtubeId ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                              )}>
-                                 {isExtracting === song.youtubeId ? (
-                                    <Loader2 className="w-4 h-4 md:w-5 md:h-5 text-white animate-spin" />
-                                 ) : (
-                                    <Play className="w-4 h-4 md:w-5 md:h-5 text-white fill-current" />
-                                 )}
-                              </div>
+                               <div className={cn(
+                                 "absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity",
+                                 (isExtracting === song.youtubeId || isActive) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                               )}>
+                                  {isExtracting === song.youtubeId ? (
+                                     <Loader2 className="w-4 h-4 md:w-5 md:h-5 text-white animate-spin" />
+                                  ) : isActive && isPlaying ? (
+                                     <div className="flex items-end gap-[2px] h-4">
+                                        <div className="w-[2px] bg-blue-600 animate-music-bar" style={{ animationDelay: '0s' }} />
+                                        <div className="w-[2px] bg-blue-600 animate-music-bar" style={{ animationDelay: '0.1s' }} />
+                                        <div className="w-[2px] bg-blue-600 animate-music-bar" style={{ animationDelay: '0.2s' }} />
+                                     </div>
+                                  ) : (
+                                     <Play className="w-4 h-4 md:w-5 md:h-5 text-white fill-current" />
+                                  )}
+                               </div>
                            </div>
                            <div className="min-w-0">
-                              <h4 className="text-xs md:text-sm font-bold text-white truncate group-hover:text-blue-500 transition-colors" dangerouslySetInnerHTML={{ __html: song.title }} />
+                              <h4 className={cn(
+                                "text-xs md:text-sm font-bold truncate transition-colors",
+                                isActive ? "text-blue-500" : "text-white group-hover:text-blue-500"
+                              )} dangerouslySetInnerHTML={{ __html: song.title }} />
                               <p className="text-[10px] md:text-xs text-gray-500 truncate md:hidden">{song.artist}</p>
                            </div>
                         </div>
@@ -161,7 +194,8 @@ export function SavedSongsView({ songs }: { songs: any[] }) {
                         </div>
                      </td>
                   </tr>
-               ))}
+               );
+               })}
             </tbody>
          </table>
          
