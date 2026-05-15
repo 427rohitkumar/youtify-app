@@ -138,19 +138,65 @@ export function PlayerBar() {
     }
   }, [volume, isPlayerReady]);
 
-  // 5. Handle time updates (YouTube doesn't have onTimeUpdate event)
+  // 5. Media Session API & Time updates
   useEffect(() => {
+    if (!currentTrack) return;
+
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title,
+        artist: currentTrack.artist,
+        artwork: [
+          { src: currentTrack.thumbnail, sizes: '96x96', type: 'image/png' },
+          { src: currentTrack.thumbnail, sizes: '128x128', type: 'image/png' },
+          { src: currentTrack.thumbnail, sizes: '192x192', type: 'image/png' },
+          { src: currentTrack.thumbnail, sizes: '256x256', type: 'image/png' },
+          { src: currentTrack.thumbnail, sizes: '384x384', type: 'image/png' },
+          { src: currentTrack.thumbnail, sizes: '512x512', type: 'image/png' },
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
+      navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
+      navigator.mediaSession.setActionHandler('previoustrack', () => playPrevious());
+      navigator.mediaSession.setActionHandler('nexttrack', () => playNext());
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined) onSeek(details.seekTime);
+      });
+    }
+
     const interval = setInterval(() => {
       if (playerRef.current && isPlayerReady && isPlaying && !isDragging) {
         const current = playerRef.current.getCurrentTime();
         const dur = playerRef.current.getDuration();
         setTime(current, dur);
         setLocalTime(current);
+
+        if ('mediaSession' in navigator && (navigator.mediaSession as any).setPositionState) {
+          try {
+            (navigator.mediaSession as any).setPositionState({
+              duration: dur || 0,
+              playbackRate: 1,
+              position: current || 0
+            });
+          } catch (e) {
+            // Some browsers might throw if state is invalid
+          }
+        }
       }
     }, 500);
 
-    return () => clearInterval(interval);
-  }, [isPlayerReady, isPlaying, isDragging]);
+    return () => {
+      clearInterval(interval);
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('previoustrack', null);
+        navigator.mediaSession.setActionHandler('nexttrack', null);
+        navigator.mediaSession.setActionHandler('seekto', null);
+      }
+    };
+  }, [isPlayerReady, isPlaying, isDragging, currentTrack?.id]);
 
   const onSeek = (val: number) => {
     setLocalTime(val);
@@ -255,8 +301,11 @@ export function PlayerBar() {
   return (
     <>
     <div className="fixed bottom-[64px] md:bottom-0 left-0 right-0 bg-[#121212]/98 backdrop-blur-2xl border-t border-white/5 px-3 md:px-6 py-2 md:py-3 z-[45] flex items-center justify-between shadow-2xl transition-all animate-in slide-in-from-bottom-4 duration-500">
-      {/* Hidden YouTube Player */}
-      <div id="youtube-player" className="hidden" />
+      {/* YouTube Player Container - Styled to stay 'visible' for background play support */}
+      <div 
+        id="youtube-player" 
+        className="fixed -left-[1000px] -top-[1000px] w-[1px] h-[1px] opacity-0 pointer-events-none z-[-1]" 
+      />
 
       {/* Mobile Timeline (Top Edge) */}
       <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/5 md:hidden overflow-hidden">

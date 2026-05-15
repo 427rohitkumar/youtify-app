@@ -20,6 +20,34 @@ export function BigPlayer({ onClose, onSeek }: { onClose: () => void, onSeek: (v
 
   const [isSaving, setIsSaving] = useState(false);
   const [showPlaylistSelector, setShowPlaylistSelector] = useState(false);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  // Minimum swipe distance (in px)
+  const minSwipeDistance = 50;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      playNext();
+    }
+    if (isRightSwipe) {
+      playPrevious();
+    }
+  };
 
   if (!currentTrack) return null;
 
@@ -116,9 +144,14 @@ export function BigPlayer({ onClose, onSeek }: { onClose: () => void, onSeek: (v
       <div className="relative z-10 flex-1 flex flex-col px-6 md:px-24 py-4 max-w-5xl mx-auto w-full min-h-0">
         {/* Artwork Area - Guaranteed space */}
         <div className="flex-1 min-h-0 flex items-center justify-center p-4">
-          <div className="h-full max-h-[300px] md:max-h-[450px] aspect-square rounded-[32px] md:rounded-[40px] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/10 relative transition-transform duration-500 hover:scale-[1.02]">
-            <img src={currentTrack.thumbnail} className="w-full h-full object-cover" alt={currentTrack.title} />
-            <div className="absolute inset-0 bg-black/20" />
+          <div 
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            className="h-full max-h-[300px] md:max-h-[450px] aspect-square rounded-[32px] md:rounded-[40px] overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/10 relative transition-transform duration-500 hover:scale-[1.02] active:scale-[0.98] cursor-grab active:cursor-grabbing"
+          >
+            <img src={currentTrack.thumbnail} className="w-full h-full object-cover pointer-events-none select-none" alt={currentTrack.title} />
+            <div className="absolute inset-0 bg-black/20 pointer-events-none" />
           </div>
         </div>
 
