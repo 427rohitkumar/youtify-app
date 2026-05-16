@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     } catch (e: any) {
       console.warn(`[Extract] ytdl-core failed for ${videoId}: ${e.message}`);
       
-      // FALLBACK 1: Cobalt API
+      // FALLBACK 1: Cobalt API (Standard)
       try {
         console.log('[Extract] Trying Fallback 1: Cobalt...');
         const cobaltRes = await fetch('https://api.cobalt.tools/api/json', {
@@ -86,14 +86,14 @@ export async function GET(request: NextRequest) {
           body: JSON.stringify({
             url: `https://www.youtube.com/watch?v=${videoId}`,
             downloadMode: 'audio',
-            audioFormat: 'mp3'
+            audioFormat: 'mp3',
+            filenamePattern: 'basic'
           })
         });
         
         const apiData = await cobaltRes.json();
-        console.log(`[Extract] Cobalt status: ${apiData.status}`);
-
         if (apiData && apiData.url) {
+          console.log('[Extract] Cobalt fallback SUCCESS');
           return NextResponse.json({
             url: apiData.url,
             duration: 0,
@@ -107,33 +107,69 @@ export async function GET(request: NextRequest) {
         console.error('[Extract] Cobalt Fallback failed:', fallbackError.message);
       }
 
-      // FALLBACK 2: Invidious API (Very robust against blocks)
+      // FALLBACK 2: Piped API (Highly reliable)
       try {
-        console.log('[Extract] Trying Fallback 2: Invidious...');
-        const invidiousInstance = 'invidious.projectsegfau.lt';
-        const invidiousRes = await fetch(`https://${invidiousInstance}/api/v1/videos/${videoId}`);
-        const invData = await invidiousRes.json();
+        console.log('[Extract] Trying Fallback 2: Piped...');
+        const pipedRes = await fetch(`https://pipedapi.kavin.rocks/streams/${videoId}`);
+        const pipedData = await pipedRes.json();
 
-        if (invData && invData.adaptiveFormats) {
-          // Find the best audio format
-          const audioFormat = invData.adaptiveFormats
-            .filter((f: any) => f.type.startsWith('audio/'))
-            .sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-
-          if (audioFormat && audioFormat.url) {
-            console.log('[Extract] Invidious fallback SUCCESS');
+        if (pipedData && pipedData.audioStreams) {
+          const bestAudio = pipedData.audioStreams.sort((a: any, b: any) => b.bitrate - a.bitrate)[0];
+          if (bestAudio && bestAudio.url) {
+            console.log('[Extract] Piped fallback SUCCESS');
             return NextResponse.json({
-              url: audioFormat.url,
-              duration: invData.lengthSeconds || 0,
-              title: invData.title || 'Streaming (Invidious)',
-              artist: invData.author || 'YouTube',
-              thumbnail: invData.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+              url: bestAudio.url,
+              duration: pipedData.duration || 0,
+              title: pipedData.title || 'Streaming (Piped)',
+              artist: pipedData.uploader || 'YouTube',
+              thumbnail: pipedData.thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
               fromFallback: true
             });
           }
         }
-      } catch (invError: any) {
-        console.error('[Extract] Invidious Fallback failed:', invError.message);
+      } catch (pipedError: any) {
+        console.error('[Extract] Piped Fallback failed:', pipedError.message);
+      }
+
+      // FALLBACK 3: Multiple Invidious Instances
+      const invidiousInstances = [
+        'invidious.projectsegfau.lt',
+        'inv.vern.cc',
+        'yewtu.be',
+        'invidious.nerdvpn.de'
+      ];
+
+      for (const instance of invidiousInstances) {
+        try {
+          console.log(`[Extract] Trying Fallback 3: Invidious (${instance})...`);
+          const invidiousRes = await fetch(`https://${instance}/api/v1/videos/${videoId}`, {
+            signal: AbortSignal.timeout(4000)
+          });
+          
+          const text = await invidiousRes.text();
+          if (!text.trim().startsWith('{')) continue; // Not JSON
+
+          const invData = JSON.parse(text);
+          if (invData && invData.adaptiveFormats) {
+            const audioFormat = invData.adaptiveFormats
+              .filter((f: any) => f.type.startsWith('audio/'))
+              .sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+
+            if (audioFormat && audioFormat.url) {
+              console.log(`[Extract] Invidious fallback (${instance}) SUCCESS`);
+              return NextResponse.json({
+                url: audioFormat.url,
+                duration: invData.lengthSeconds || 0,
+                title: invData.title || 'Streaming (Invidious)',
+                artist: invData.author || 'YouTube',
+                thumbnail: invData.videoThumbnails?.[0]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                fromFallback: true
+              });
+            }
+          }
+        } catch (invError: any) {
+          console.warn(`[Extract] Invidious Instance ${instance} failed:`, invError.message);
+        }
       }
       
       throw e; 
