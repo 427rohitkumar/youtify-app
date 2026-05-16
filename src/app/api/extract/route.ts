@@ -108,27 +108,40 @@ export async function GET(request: NextRequest) {
       }
 
       // FALLBACK 2: Piped API (Highly reliable)
-      try {
-        console.log('[Extract] Trying Fallback 2: Piped...');
-        const pipedRes = await fetch(`https://pipedapi.kavin.rocks/streams/${videoId}`);
-        const pipedData = await pipedRes.json();
+      const pipedInstances = [
+        'https://pipedapi.kavin.rocks',
+        'https://api-piped.mha.fi',
+        'https://pipedapi.leptons.xyz',
+        'https://piped-api.garudalinux.org'
+      ];
 
-        if (pipedData && pipedData.audioStreams) {
-          const bestAudio = pipedData.audioStreams.sort((a: any, b: any) => b.bitrate - a.bitrate)[0];
-          if (bestAudio && bestAudio.url) {
-            console.log('[Extract] Piped fallback SUCCESS');
-            return NextResponse.json({
-              url: bestAudio.url,
-              duration: pipedData.duration || 0,
-              title: pipedData.title || 'Streaming (Piped)',
-              artist: pipedData.uploader || 'YouTube',
-              thumbnail: pipedData.thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-              fromFallback: true
-            });
+      for (const instance of pipedInstances) {
+        try {
+          console.log(`[Extract] Trying Fallback 2: Piped (${instance})...`);
+          const pipedRes = await fetch(`${instance}/streams/${videoId}`, {
+            signal: AbortSignal.timeout(4000)
+          });
+          
+          if (!pipedRes.ok) continue;
+          const pipedData = await pipedRes.json();
+
+          if (pipedData && pipedData.audioStreams) {
+            const bestAudio = pipedData.audioStreams.sort((a: any, b: any) => b.bitrate - a.bitrate)[0];
+            if (bestAudio && bestAudio.url) {
+              console.log(`[Extract] Piped fallback (${instance}) SUCCESS`);
+              return NextResponse.json({
+                url: bestAudio.url,
+                duration: pipedData.duration || 0,
+                title: pipedData.title || 'Streaming (Piped)',
+                artist: pipedData.uploader || 'YouTube',
+                thumbnail: pipedData.thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                fromFallback: true
+              });
+            }
           }
+        } catch (pipedError: any) {
+          console.warn(`[Extract] Piped Fallback (${instance}) failed:`, pipedError.message);
         }
-      } catch (pipedError: any) {
-        console.error('[Extract] Piped Fallback failed:', pipedError.message);
       }
 
       // FALLBACK 3: Multiple Invidious Instances
